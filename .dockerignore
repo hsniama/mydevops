@@ -1,0 +1,10 @@
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+.env
+.venv/
+tests/
+ComandosUsados.txt

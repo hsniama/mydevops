@@ -1,0 +1,199 @@
+Azure repos - Credenciales
+username:
+henrysebastian.niama
+
+password:
+8ckA5T3RkIluaSO3vIR1dfOwJiEeDGBVFzjVTlxSP2z5CHbNSOcVJQQJ99BEACAAAAA9tF8vAAASAZDO2IUd
+
+
+ACR
+Login Server: devopsregistryhenry.azurecr.io
+user: devopsregistryhenry
+pass: 7fBnVsQvMIt97laH19htty5eB0EOgfBxUVrIxvo6+c+ACRDmv/44
+pass2: 0cSLACqeI7LCGF4EVS3d2kQbMgpX2mUrAy1gtHrO29+ACRAyy5qf
+
+
+
+--------------------------------------------------------------------------------------------------
+Cada que se hace un cambio en el código:
+
+git add . && git commit -m "Modificacion de README"
+git push
+
+Y poner clave de azure repos
+
+-------------------------------------------------------------------------------------------------------------
+Fase 1: 
+uvicorn app.main:app --reload
+
+ejecutar ambiente de python
+
+curl -X GET http://localhost:8000/generate-jwt
+
+curl -X POST http://localhost:8000/DevOps \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGVzdCIsImV4cCI6MTc0NzcxNDA2M30.pGAJ8x2eqBloEBGh7GlsngZg6VqVo8XGuS_NQJVjQis" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hola",
+    "to": "Henry",
+    "from": "Azure",
+    "timeToLifeSec": 45
+}'
+
+---------------------------------------------------------------------------------------------------------------------------
+Fase 2:
+
+- Construir imagen:
+docker build -t devops-microservice:local .
+
+
+Nota: Si cambiamos el dockerfile hay que reconstruir la imagen y para eso primero hay que borrarla y volverla a crear.
+Lo mismo con el contenedor.
+
+Cambios que requieren reconstrucción de la imagen:
+
+Modificas el Dockerfile
+Cambias el requirements.txt
+Cambias código fuente y usas COPY . . en el Dockerfile
+Cambias la estructura de carpetas o rutas copiadas al contenedor
+Quieres cambiar la imagen base (FROM python:...)
+Actualizas dependencias (pip, apt, etc.)
+Cambias la CMD o ENTRYPOINT
+
+- Cosntruir contenedor:
+
+docker rm -f devops-microservice
+docker rmi devops-microservice:local
+
+docker build -t devops-microservice:local .
+
+Correr contenedor sin pasar las claves (recomendado):
+docker run -d --name devops-microservice \
+  --env-file .env \
+  -p 8000:8000 \
+  devops-microservice:local
+
+Correr contenedor pasando las claves:
+docker run --name devops-microservice \
+  -p 8000:8000 \
+  --env SECRET_KEY=clave_super_secreta_segura \
+  --env API_KEY=2f5ae96c-b558-4c7b-a590-a501ae1c3f6c \
+  devops-microservice:local
+
+docker start -ai devops-microservice
+
+Para entrar al contenedor:
+docker exec -it devops-microservice /bin/sh
+
+
+Acceder en el navegador: http://localhost:8000/generate-jwt 
+y ejecutar el curl ...
+
+------------------------------------------------------------------------------
+Empaquetar tu imagen en un archivo .tar para compartirla (siempre y cuando pasamos las claves de .env directamente en 
+el comando de docker para crear el contenedor):
+
+docker save -o devops_microservice.tar devops-microservice:local
+
+Ese .tar pasamos a la persona y el ejecutará esto:
+
+docker load -i /ruta/donde/guardo/devops_microservice.tar
+
+Una ves carga la imagen, el ya puede correr el contenedor si esta en Linux:
+
+docker run --name devops-microservice \
+  -p 8000:8000 \
+  --env SECRET_KEY=clave_super_secreta_segura \
+  --env API_KEY=2f5ae96c-b558-4c7b-a590-a501ae1c3f6c \
+  devops-microservice:local
+
+O si estan en windows en powershell o CMD con:
+
+docker run --name devops-microservice ^
+  -p 8000:8000 ^
+  --env SECRET_KEY=clave_super_secreta_segura ^
+  --env API_KEY=2f5ae96c-b558-4c7b-a590-a501ae1c3f6c ^
+  devops-microservice:local
+
+Y ya puede probar con: http://localhost:8000/generate-jwt 
+
+------------------------------------------------------------------------------------
+
+Fase 3:
+docker build -t devops-microservice:v7 .
+docker tag devops-microservice:v4 devopsregistryhenry.azurecr.io/devops-microservice:v7
+docker push devopsregistryhenry.azurecr.io/devops-microservice:v7
+
+
+curl -X POST https://devops-ms-henry-hhfsbjcubeh5ehg3.eastus-01.azurewebsites.net/DevOps \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGVzdCIsImV4cCI6MTc0MzU2Mjc5MX0.8m2XG-mU61bV2bohMOAMR2x-zdj0sDzd6QzXDjupEzU" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hola",
+    "to": "Henry",
+    "from": "Azure",
+    "timeToLifeSec": 45
+}'
+
+http://localhost:8000/generate-jwt 
+
+Prender el contenedor con:
+ docker run -d -p 8000:8000 --name devops-microservice devops-microservice:local
+
+---
+generar jwt
+python -m app.utils.generate_jwt
+
+
+---
+
+--------------- AKS
+
+Creación
+az aks create \
+  --resource-group devops \
+  --name aks-devops-henry \
+  --node-count 2 \
+  --generate-ssh-keys
+
+conectar terminal al cluster:
+ az aks get-credentials --resource-group devops --name aks-devops-henry
+
+Verificación de estar conectado.
+kubectl get nodes
+
+Verificar imagen en ACR
+az acr repository list --name devopsregistryhenry --output table
+
+
+
+tener IP publica
+kubectl get service devops-service
+
+
+get:
+http://134.33.251.5/generate-jwt
+
+post:
+
+curl -X POST http://134.33.251.5/DevOps \
+-H "Content-Type: application/json" \
+-H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+-H "X-JWT-KWY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGVzdCIsImV4cCI6MTc0MzkxNDcyNX0.grcmx9gUWXbx1qT4X7NKQrOci9x0IIgRT0IIY6UghiQ" \
+-d '{
+  "message": "This is a test",
+  "to": "Juan Perez",
+  "from": "Rita Asturia",
+  "timeToLifeSec": 45
+}'
+
+
+
+******
+Para conectarnos al cluster:
+az aks get-credentials --resource-group DevOpsRG --name devops-aks --overwrite-existing
+
+Crear los secretos:
+kubectl create secret generic devops-secrets --from-literal=API_KEY='2f5ae96c-b558-4c7b-a590-a501ae1c3f6c' --from-literal=SECRET_KEY='clave_super_secreta_segura' --namespace default

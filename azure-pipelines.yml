@@ -1,0 +1,101 @@
+trigger:
+  branches:
+    include:
+      - dev
+      - master
+
+variables:
+  - group: env-variables  # Variables seguras de Azure DevOps
+  - name: imageName
+    value: devops-microservice
+  - name: dockerRegistryServiceConnection
+    value: acr-admin-henry
+  - name: containerRegistry
+    value: devopsregistryhenry.azurecr.io
+  - name: secretKey
+    value: $(SECRET_KEY)
+  - name: apiKey
+    value: $(API_KEY)
+  - name: tag
+    value: $(Build.BuildId)
+
+stages:
+  - stage: Build
+    displayName: 'Fase de Build'
+    jobs:
+      - job: BuildJob
+        displayName: 'Build Docker'
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.12'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+            displayName: 'Instalar dependencias'
+
+          - task: Docker@2
+            displayName: 'Build Docker image'
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: $(containerRegistry)/$(imageName)
+              command: build
+              Dockerfile: Dockerfile
+              tags: $(tag)
+
+          - task: Docker@2
+            displayName: 'Push Docker image to ACR'
+            inputs:
+              containerRegistry: $(dockerRegistryServiceConnection)
+              repository: $(containerRegistry)/$(imageName)
+              command: push
+              tags: $(tag)
+
+  - stage: Test
+    displayName: 'Fase de Test y Seguridad'
+    dependsOn: Build
+    jobs:
+      - job: TestJob
+        displayName: 'Lint + Seguridad + Tests'
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.12'
+
+          - script: |
+              python -m pip install --upgrade pip
+              pip install -r requirements.txt
+              echo "Exportando variables para pytest"
+              export SECRET_KEY=$(secretKey)
+              export API_KEY=$(apiKey)
+              flake8 app tests --max-line-length=120
+              bandit -r app
+              SECRET_KEY=$SECRET_KEY API_KEY=$API_KEY pytest -v
+            displayName: 'Linting + Seguridad + Tests'
+
+  - stage: Deploy
+    displayName: 'Despliegue a AKS'
+    dependsOn: Test
+    condition: eq(variables['Build.SourceBranch'], 'refs/heads/master')
+    jobs:
+      - job: DeployJob
+        displayName: 'Deploy to AKS'
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: AzureCLI@2
+            inputs:
+              azureSubscription: 'YOUR-AZURE-SERVICE-CONNECTION'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                echo "Login a AKS"
+                az aks get-credentials --resource-group DevOpsRG --name devops-aks
+                echo "Actualizar deployment con nueva imagen"
+                kubectl set image deployment/devops-microservice \
+                  devops-microservice=$(containerRegistry)/$(imageName):$(tag)
