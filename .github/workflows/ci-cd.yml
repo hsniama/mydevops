@@ -105,6 +105,9 @@ jobs:
       contents: read
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Azure login (OIDC)
         uses: azure/login@v2
         with:
@@ -128,11 +131,25 @@ jobs:
           kubelogin convert-kubeconfig -l azurecli
           kubectl cluster-info
 
-      - name: Apply base manifests (namespace/secret/svc/ingress/hpa)
+      # (Opcional) Ver el arbol para confirmar rutas
+      - name: Show repo tree
         run: |
+          pwd
+          ls -la
+          echo "---- k8s ----"
+          ls -la k8s
+
+      - name: Apply base manifests (namespace/secret/svc/ingress/hpa)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 1) Namespace + Secrets primero
           kubectl apply -f k8s/namespace-secrets.yaml
+          # 2) Deployment + Service
           kubectl apply -f k8s/deployment-service.yaml
+          # 3) Ingress
           kubectl apply -f k8s/ingress.yaml
+          # 4) HPA
           kubectl apply -f k8s/hpa.yaml
 
       - name: Set new image (immutable SHA)

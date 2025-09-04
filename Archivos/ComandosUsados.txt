@@ -494,7 +494,7 @@ APP_NAME="gh-oidc-devops"
 RG="rg-devops-henry"
 AKS="aks-devops-henry"
 ACR="acrdevopshenry"
-REPO="hsniama/devops-devsu"   # <--- tu repo público en GitHub
+REPO="hsniama/mydevops"   # <--- tu repo público en GitHub
 
 2. Crear App Registration (Entra ID) + Service Principal
 
@@ -526,7 +526,7 @@ az role assignment create --assignee "$APP_ID" --role "Azure Kubernetes Service 
 az ad app federated-credential create --id "$APP_ID" --parameters '{
   "name": "gh-dev-branch",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:shimzhen/devops-test:ref=refs/heads/dev",
+  "subject": "repo:$REPO:ref:refs/heads/dev",
   "audiences": ["api://AzureADTokenExchange"]
 }'
 
@@ -542,6 +542,25 @@ az ad app federated-credential create --id "$APP_ID" --parameters "$(cat <<EOF
 EOF
 )"
 
+
+Solamente en caso de identificar el ID de estos dos federados y haya que borrarlo para corregir alguno, ejecutar:
+
+
+APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
+
+# Ver todo (con IDs)
+az ad app federated-credential list --id "$APP_ID" -o jsonc
+
+Agarramos ese ID y lo copiamos manualmente para ejecutar lo siguiente
+
+FED_ID="df9e579e-2a58-4741-8824-41e9cfd6f086"
+
+az ad app federated-credential delete \
+  --id "$APP_ID" \
+  --federated-credential-id "$FED_ID"
+
+Validamos otra vez
+az ad app federated-credential list --id "$APP_ID" -o table
 
 
 5. Guarda estos 3 secretos en tu repo de GitHub (Settings → Secrets and variables → Actions → New repository secret):
