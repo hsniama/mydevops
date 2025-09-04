@@ -1,0 +1,166 @@
+name: CI-CD
+
+on:
+  push:
+    branches: ["**"]  # corre en cualquier rama (deploy solo en dev/master)
+  pull_request:
+  workflow_dispatch:
+
+env:
+  RG: rg-devops-henry
+  AKS_NAME: aks-devops-henry
+  ACR_NAME: acrdevopshenry
+  IMAGE_NAME: devops-microservice
+  NAMESPACE: devops
+
+jobs:
+  ci:
+    name: Fase Lint + Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Lint (flake8)
+        run: flake8 .
+
+      - name: Security (bandit)
+        run: bandit -r app
+
+      - name: Tests (pytest)
+        env:
+          API_KEY: ${{ secrets.API_KEY }}
+          SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        run: pytest -q
+
+  build_push:
+    name: Fase Build & Push to ACR (ACR Tasks)
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: ACR login server
+        id: acr
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACR_LOGIN_SERVER=$(az acr show -n "$ACR_NAME" -g "$RG" --query loginServer -o tsv)
+          echo "login=$ACR_LOGIN_SERVER" >> "$GITHUB_OUTPUT"
+
+      - name: "ACR Build (tags: sha y branch)"
+        shell: bash
+        run: |
+          set -euo pipefail
+          LOGIN="${{ steps.acr.outputs.login }}"
+          # nombre de rama seguro (dev/master en tu caso)
+          BRANCH="${GITHUB_REF_NAME//\//-}"
+
+          IMAGE_SHA="${LOGIN}/${IMAGE_NAME}:${{ github.sha }}"
+          IMAGE_BRA="${LOGIN}/${IMAGE_NAME}:${BRANCH}"
+
+          echo "Building $IMAGE_SHA and $IMAGE_BRA"
+          az acr build \
+            --registry "$ACR_NAME" \
+            --image "$IMAGE_SHA" \
+            --image "$IMAGE_BRA" \
+            .
+
+      - name: Set outputs
+        id: img
+        shell: bash
+        run: |
+          echo "image_sha=${{ steps.acr.outputs.login }}/${IMAGE_NAME}:${{ github.sha }}" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: Fase Deploy to AKS
+    needs: build_push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/master'
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Install kubectl
+        uses: azure/setup-kubectl@v4
+
+      - name: Use kubelogin for AAD
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: "v0.0.33"
+
+      - name: Get AKS credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          az aks get-credentials -g "$RG" -n "$AKS_NAME" --overwrite-existing
+          kubelogin convert-kubeconfig -l azurecli
+          kubectl cluster-info
+
+      # (Opcional) Ver el arbol para confirmar rutas
+      - name: Show repo tree
+        run: |
+          pwd
+          ls -la
+          echo "---- k8s ----"
+          ls -la k8s
+
+      - name: Apply base manifests (namespace/secret/svc/ingress/hpa)
+        shell: bash
+        env:
+          HOST: henrydevops.duckdns.org
+        run: |
+          set -euo pipefail
+          kubectl apply -f k8s/namespace-secrets.yaml
+          kubectl apply -f k8s/deployment-service.yaml
+          sed -e "s|<HOST>|$HOST|g" k8s/ingress.yaml | kubectl apply -f -
+          kubectl apply -f k8s/hpa.yaml
+
+
+      - name: Set new image (immutable SHA)
+        shell: bash
+        run: |
+          set -euo pipefail
+          ACR_LOGIN_SERVER=$(az acr show -n "$ACR_NAME" -g "$RG" --query loginServer -o tsv)
+          IMAGE="${ACR_LOGIN_SERVER}/${IMAGE_NAME}:${{ github.sha }}"
+          echo "Deploying image: $IMAGE"
+          kubectl -n "$NAMESPACE" set image deployment/devops-app app="$IMAGE"
+          kubectl -n "$NAMESPACE" rollout status deployment/devops-app --timeout=120s
+
+      - name: Show status
+        run: |
+          kubectl -n "$NAMESPACE" get deploy,po,svc,ingress,hpa -o wide

@@ -1,22 +1,35 @@
-import jwt
 import os
 from datetime import datetime, timedelta
+
+import jwt
 
 # Conjunto para guardar los tokens usados
 used_tokens = set()
 
+
 def create_jwt(payload: dict, secret_key: str, expires_in: int = 60) -> str:
+    """Crea un JWT con expiración definida en segundos."""
     if not secret_key:
-        raise ValueError("SECRET_KEY no está definido. Verifica las variables de entorno en Azure.")
-    
-    payload.update({"exp": datetime.utcnow() + timedelta(seconds=expires_in)})
+        raise ValueError(
+            "SECRET_KEY no está definido. "
+            "Verifica las variables de entorno en Azure."
+        )
+
+    payload.update(
+        {"exp": datetime.utcnow() + timedelta(seconds=expires_in)}
+    )
     token = jwt.encode(payload, secret_key, algorithm="HS256")
     return token
 
+
 def verify_jwt(token: str) -> bool:
+    """Verifica la validez de un JWT y evita reutilización de tokens."""
     secret_key = os.getenv("SECRET_KEY")
     if not secret_key:
-        raise ValueError("SECRET_KEY no está definido. Verifica las variables de entorno en Azure.")
+        raise ValueError(
+            "SECRET_KEY no está definido. "
+            "Verifica las variables de entorno en Azure."
+        )
 
     # Verificar si ya fue usado
     if token in used_tokens:

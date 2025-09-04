@@ -2,18 +2,26 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: devops-ingress
+  namespace: devops
   annotations:
-    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "INGRESS_STICKY"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "300"
 spec:
+  ingressClassName: nginx
   tls:
     - hosts:
-        - devops-app.yourdomain.com
-      secretName: devops-tls-secret  # secreto TLS previamente creado
+        - <HOST>
+      secretName: devops-tls
   rules:
-    - host: devops-app.yourdomain.com
+    - host: <HOST>
       http:
         paths:
-          - path: /DevOps
+          # Ruta general: expone /, por lo que /DevOps y /generate-jwt pasan tal cual
+          - path: /
             pathType: Prefix
             backend:
               service:

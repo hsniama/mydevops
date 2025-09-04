@@ -21,6 +21,10 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
+# === Paso 4.1: instalar curl para el HEALTHCHECK ===
+RUN apk add --no-cache curl
+
+
 # === Paso 5: Copiar código fuente ===
 COPY . .
 
@@ -32,10 +36,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # === Paso 7: Limpieza del sistema y eliminación de posibles paquetes vulnerables ===
 RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
 
-# === Paso 8: Añadir HEALTHCHECK para monitoreo ===
-# - Satisface recomendaciones de Trivy y CIS Benchmark
-HEALTHCHECK --interval=30s --timeout=5s \
-    CMD curl -f http://localhost:8000/docs || exit 1
+# === Paso 8: HEALTHCHECK robusto ===
+# - --retries: reintenta antes de marcar unhealthy
+# - --start-period: da tiempo extra al arranque inicial
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 --start-period=10s \
+    CMD curl -fsS http://127.0.0.1:8000/docs >/dev/null || exit 1
 
 # === Paso 9: Exponer puerto usado por Gunicorn/Uvicorn ===
 EXPOSE 8000
