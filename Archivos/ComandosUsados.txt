@@ -480,6 +480,110 @@ kubectl -n devops rollout restart deployment/devops-app
 kubectl -n devops rollout status  deployment/devops-app
 
 
+-------------------------------------------------------------------------------------------
+
+Conexión Azure - Preparar OIDC (una sola vez)
+
+Abrir Azure Cloud Bash y ejecutar:
+
+1. Variables
+
+SUBS="673cc71e-b603-4e80-8ceb-7a980df54561"
+TENANT_ID="$(az account show --query tenantId -o tsv)"
+APP_NAME="gh-oidc-devops"
+RG="rg-devops-henry"
+AKS="aks-devops-henry"
+ACR="acrdevopshenry"
+REPO="hsniama/devops-devsu"   # <--- tu repo público en GitHub
+
+2. Crear App Registration (Entra ID) + Service Principal
+
+APP_ID=$(az ad app create --display-name "$APP_NAME" --query appId -o tsv)
+az ad sp create --id "$APP_ID"
+echo "APP_ID=$APP_ID"
+
+
+3. Roles mínimos (scope más seguro)
+
+
+# Acceso a RG para kubectl/recursos
+az role assignment create --assignee "$APP_ID" --role "Contributor" \
+  --scope "/subscriptions/$SUBS/resourceGroups/$RG"
+
+# Push de imágenes al ACR
+ACR_ID=$(az acr show -n "$ACR" -g "$RG" --query id -o tsv)
+az role assignment create --assignee "$APP_ID" --role "AcrPush" --scope "$ACR_ID"
+
+# Obtener credenciales de AKS (cluster user)
+AKS_ID=$(az aks show -n "$AKS" -g "$RG" --query id -o tsv)
+az role assignment create --assignee "$APP_ID" --role "Azure Kubernetes Service Cluster User Role" --scope "$AKS_ID"
+
+
+
+4. Federated Credentials (por rama)
+
+# dev
+az ad app federated-credential create --id "$APP_ID" --parameters '{
+  "name": "gh-dev-branch",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:shimzhen/devops-test:ref=refs/heads/dev",
+  "audiences": ["api://AzureADTokenExchange"]
+}'
+
+
+# master
+az ad app federated-credential create --id "$APP_ID" --parameters "$(cat <<EOF
+{
+  "name": "gh-master-branch",
+  "issuer": "https://token.actions.githubusercontent.com",
+  "subject": "repo:$REPO:ref:refs/heads/master",
+  "audiences": ["api://AzureADTokenExchange"]
+}
+EOF
+)"
+
+
+
+5. Guarda estos 3 secretos en tu repo de GitHub (Settings → Secrets and variables → Actions → New repository secret):
+
+AZURE_CLIENT_ID = APP_ID (del paso 2)
+
+AZURE_TENANT_ID = TENANT_ID (del paso 1)
+
+AZURE_SUBSCRIPTION_ID = 673cc71e-b603-4e80-8ceb-7a980df54561
+
+Con esto, azure/login@v2 podrá autenticarse en Azure con OIDC sin Client Secret.
+
+Ahora se crea el CI-CD.yml.
+
+ci → lint (flake8), SAST (bandit) y tests (pytest).
+
+build_push → login con OIDC, ACR build (2 tags: SHA y branch).
+
+deploy (solo dev/master) → login OIDC, kubectl con kubelogin, actualiza imagen del deployment a la etiqueta SHA y espera el rollout.
+
+Usamos az acr build (ACR Tasks) para evitar depender de Docker en el runner y acelerar builds.
+
+Se hace git commit y push en cualquier cambio y:
+
+git add . 
+git commit -m "Adicion algún cambio"
+git push origin dev
+
+
+
+Ve a Actions en GitHub y mira correr los jobs:
+
+ci debe pasar (si algo de lint/test falla, corrige y reintenta).
+
+build_push debe etiquetar en ACR: :dev y :<SHA>.
+
+deploy (por estar en dev) debe actualizar el deployment en AKS.
+
+Verifica en AKS:
+
+kubectl -n devops get deploy devops-app -o yaml | grep -A1 "image:"
+kubectl -n devops get pods -o wide
 
 
 -----------------------------------------------------------------------------------------

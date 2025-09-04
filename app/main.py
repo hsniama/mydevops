@@ -35,8 +35,14 @@ async def devops_endpoint(
         alias="X-JWT-KWY",
     ),
 ):
-    if not x_parse_rest_api_key or x_parse_rest_api_key != EXPECTED_API_KEY:
-        raise HTTPException(status_code=401, detail="Invalid or missing API Key")
+    if (
+        not x_parse_rest_api_key
+        or x_parse_rest_api_key != EXPECTED_API_KEY
+    ):
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or missing API Key",
+        )
 
     if not x_jwt_kwy or not verify_jwt(x_jwt_kwy):
         raise HTTPException(status_code=403, detail="Invalid or missing JWT")
