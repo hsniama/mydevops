@@ -1,12 +1,14 @@
-from fastapi import FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
 from typing import Optional
 import os
-from app.utils.jwt_handler import verify_jwt
-from app.utils.jwt_handler import create_jwt
-from dotenv import load_dotenv
 
-load_dotenv() # Esto solo sirve localmente. En Azure, no carga .env, sino variables del entorno del sistema
+from dotenv import load_dotenv
+from fastapi import FastAPI, Header, HTTPException
+from pydantic import BaseModel, Field
+
+from app.utils.jwt_handler import create_jwt, verify_jwt
+
+# Carga solo afecta al entorno local; en Azure usas variables del sistema
+load_dotenv()  # local only; Azure uses real env vars
 
 app = FastAPI()
 
@@ -24,16 +26,17 @@ class DevOpsPayload(BaseModel):
 @app.post("/DevOps")
 async def devops_endpoint(
     payload: DevOpsPayload,
-    X_Parse_REST_API_Key: Optional[str] = Header(None),
-    X_JWT_KWY: Optional[str] = Header(None)
+    x_parse_rest_api_key: Optional[str] = Header(default=None, alias="X-Parse-REST-API-Key"),
+    x_jwt_kwy: Optional[str] = Header(default=None, alias="X-JWT-KWY"),
 ):
-    if not X_Parse_REST_API_Key or X_Parse_REST_API_Key != EXPECTED_API_KEY:
+    if not x_parse_rest_api_key or x_parse_rest_api_key != EXPECTED_API_KEY:
         raise HTTPException(status_code=401, detail="Invalid or missing API Key")
 
-    if not X_JWT_KWY or not verify_jwt(X_JWT_KWY):
+    if not x_jwt_kwy or not verify_jwt(x_jwt_kwy):
         raise HTTPException(status_code=403, detail="Invalid or missing JWT")
 
     return {"message": f"Hello {payload.to} your message will be send"}
+
 
 @app.api_route("/DevOps", methods=["GET", "PUT", "DELETE", "PATCH"])
 async def invalid_methods():
@@ -42,7 +45,6 @@ async def invalid_methods():
 
 @app.get("/generate-jwt")
 def generate_jwt_endpoint():
-    SECRET_KEY = os.getenv("SECRET_KEY")
     if not SECRET_KEY:
         raise HTTPException(status_code=500, detail="SECRET_KEY is not set")
 
