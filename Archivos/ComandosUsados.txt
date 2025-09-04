@@ -256,7 +256,7 @@ Puedes actualizarlo manualmente ahora; si luego cambia, lo actualizas otra vez (
 
 Con eso ya tienes un HOST gratuito y estable: henrydevops.duckdns.org.
 
-Ip de ejemplo que me da: 4.157.205.238
+Ip de ejemplo que me da: 20.242.234.109
 
 
 Paso 5. Instalar cert-manager (emisión automática de TLS)
@@ -359,7 +359,7 @@ Después validamos con el comando:
 
 Una ves creado el ingress.yaml 
 
-Aplicar:
+Aplicar/ejecutar el siguiente comando:
 sed -e "s|<HOST>|$HOST|g" ingress.yaml | kubectl apply -f -
 
 
@@ -375,7 +375,7 @@ Si DuckDNS ya resolvía hacia la IP del Ingress Controller (la que obtuviste ant
 
 7.4 HPA (Horizontal Pod Autoscaler)
 
-una vez creado el hpa.yaml
+una vez creado el hpa.yaml, ejecutar:
 
 kubectl apply -f hpa.yaml
 kubectl -n devops get hpa
@@ -412,6 +412,17 @@ curl -X POST "https://$HOST/DevOps" \
     "timeToLifeSec": 45
 }'
 
+
+curl -X POST "https://$HOST/DevOps" \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGVzdCIsImV4cCI6MTc1NzYwOTE2Nn0.cOCelj4SN7NplooskKc9v5rZKtpl_8wqJiCi1ABJkwg" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "This is a test",
+    "to": "Juan Perez",
+    "from": "Rita Asturia",
+    "timeToLifeSec": 45
+}'
 
 
 Opción 2:
@@ -458,7 +469,7 @@ curl.exe -X POST "https://$MyHOST/DevOps" `
   -d '{"message":"This is a test","to":"Juan Perez","from":"Rita Asturia","timeToLifeSec":45}'
 
 
-Si un por sia caso hubiera errore con el AP Key ejecutar esto que recrea el secret y reinicia el deployment::
+Si un por sia caso hubiera errores con el AP Key ejecutar esto que recrea el secret y reinicia el deployment::
 
 kubectl -n devops create secret generic devops-secrets \
   --from-literal=SECRET_KEY='clave_super_secreta_segura' \
