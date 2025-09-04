@@ -526,7 +526,7 @@ az role assignment create --assignee "$APP_ID" --role "Azure Kubernetes Service 
 az ad app federated-credential create --id "$APP_ID" --parameters '{
   "name": "gh-dev-branch",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:$REPO:ref:refs/heads/dev",
+  "subject": "repo:hsniama/mydevops:ref:refs/heads/dev",
   "audiences": ["api://AzureADTokenExchange"]
 }'
 
@@ -536,7 +536,7 @@ az ad app federated-credential create --id "$APP_ID" --parameters "$(cat <<EOF
 {
   "name": "gh-master-branch",
   "issuer": "https://token.actions.githubusercontent.com",
-  "subject": "repo:$REPO:ref:refs/heads/master",
+  "subject": "repo:hsniama/mydevops:ref:refs/heads/master",
   "audiences": ["api://AzureADTokenExchange"]
 }
 EOF
@@ -553,7 +553,7 @@ az ad app federated-credential list --id "$APP_ID" -o jsonc
 
 Agarramos ese ID y lo copiamos manualmente para ejecutar lo siguiente
 
-FED_ID="df9e579e-2a58-4741-8824-41e9cfd6f086"
+FED_ID="ca47c62f-cab6-44c1-b8b2-5774f45bbeb5"
 
 az ad app federated-credential delete \
   --id "$APP_ID" \
