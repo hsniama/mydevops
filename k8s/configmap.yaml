@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: devops-config
-  namespace: devops
-data:
-  APP_ENV: "production"
-  APP_PORT: "8000"
-

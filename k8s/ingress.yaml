@@ -4,23 +4,27 @@ metadata:
   name: devops-ingress
   namespace: devops
   annotations:
-    kubernetes.io/ingress.class: nginx
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "INGRESS_STICKY"
+    nginx.ingress.kubernetes.io/session-cookie-max-age: "300"
 spec:
+  ingressClassName: nginx
   tls:
-  - hosts:
-    - devops-henry-2025.eastus.cloudapp.azure.com
-    secretName: devops-tls
+    - hosts:
+        - <HOST>
+      secretName: devops-tls
   rules:
-  - host: devops-henry-2025.eastus.cloudapp.azure.com
-    http:
-      paths:
-      - path: /DevOps
-        pathType: Prefix
-        backend:
-          service:
-            name: devops-service
-            port:
-              number: 80
+    - host: <HOST>
+      http:
+        paths:
+          # Ruta general: expone /, por lo que /DevOps y /generate-jwt pasan tal cual
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: devops-service
+                port:
+                  number: 80
