@@ -28,11 +28,14 @@ uvicorn app.main:app --reload
 
 ejecutar ambiente de python
 
+
+curl -X GET https://devops-henry-2025.eastus.cloudapp.azure.com/generate-jwt
+
 curl -X GET http://localhost:8000/generate-jwt
 
 curl -X POST http://localhost:8000/DevOps \
   -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
-  -H "X-JWT-KWY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGVzdCIsImV4cCI6MTc0NzcxNDA2M30.pGAJ8x2eqBloEBGh7GlsngZg6VqVo8XGuS_NQJVjQis" \
+  -H "X-JWT-KWY: (endpoint obtenido en el primer endpoint get)" \
   -H "Content-Type: application/json" \
   -d '{
     "message": "Hola",
@@ -192,8 +195,143 @@ curl -X POST http://134.33.251.5/DevOps \
 
 
 ******
-Para conectarnos al cluster:
-az aks get-credentials --resource-group DevOpsRG --name devops-aks --overwrite-existing
+Paso 1. Crear la Infra:
+terraform init 
+terraform plan
+terraform apply -auto-approve
 
-Crear los secretos:
-kubectl create secret generic devops-secrets --from-literal=API_KEY='2f5ae96c-b558-4c7b-a590-a501ae1c3f6c' --from-literal=SECRET_KEY='clave_super_secreta_segura' --namespace default
+
+Paso 2.
+az login
+az account show
+az account set --subscription "Nombre-de-tu-suscripcion"
+Autenticarse en el ACR
+az acr login --name devopsregistryhenry2025
+az acr login -n devopsregistryhenry2025 --expose-token
+Puedes validar con:
+az acr list --resource-group DevOpsRG --query "[].{acrLoginServer:loginServer}" --output table
+
+
+az acr credential show --name devopsregistryhenry2025
+{
+  "passwords": [
+    {
+      "name": "password",
+      "value": "EQnnhodIP+fNsM8hriCJ46L6bs4phA5oocTq03ezMY+ACRCxGKq6"
+    },
+    {
+      "name": "password2",
+      "value": "SjbVM6omhmLSwmWAOBJSJJQ/ULvgjahtiHL37r7/E3+ACRCh7igi"
+    }
+  ],
+  "username": "devopsregistryhenry2025"
+}
+
+
+docker login devopsregistryhenry2025.azurecr.io
+
+Construir la imagen local Desde la raíz de tu proyecto:
+docker build -t devops-microservice:latest .
+
+Etiquetar la imagen con la URL del ACR
+Necesitamos “taggear” la imagen local para empujarla al ACR:
+docker tag devops-microservice:latest devopsregistryhenry2025.azurecr.io/devops-microservice:latest
+
+Hacer push al ACR para subir la imagen:
+docker push devopsregistryhenry2025.azurecr.io/devops-microservice:latest
+
+Verificar en ACR
+Puedes comprobar que está en tu registro:
+az acr repository list --name devopsregistryhenry2025 --output table
+az acr repository show-tags --name devopsregistryhenry2025 --repository devops-microservice:latest --output table
+
+
+
+
+Pasp 3.
+Asegurarnos de tener acceso al AKS
+
+Primero verifica que puedes conectarte a tu cluster AKS:
+
+az aks get-credentials --resource-group DevOpsRG --name devops-aks --overwrite-existing
+kubectl get nodes
+Si ves tus nodos, ya estás conectado.
+
+Creamos el archivo:
+k8s/secret.yaml
+
+Y ejecutamos:
+kubectl apply -f k8s/secret.yaml
+kubectl get secret devops-secrets
+
+Deployment del microservicio
+Archivo:
+k8s/deployment.yaml
+
+aplicamos el deployment:
+kubectl apply -f k8s/deployment.yaml
+kubectl get pods
+
+Service LoadBalancer
+Archivo:
+k8s/service.yaml
+Aplica el service:
+kubectl apply -f k8s/service.yaml
+kubectl get svc
+
+Verificar la IP y DNS
+kubectl get svc devops-service
+
+TLS Self-signed para HTTPS
+Generamos certificado autofirmado (gratis, no personalizado):
+Creo la carpeta certificado en la raiz y ejecuto el siguiente comando en bash:
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout tls.key -out tls.crt -subj "/CN=microservice.local/O=DevOpsTest"
+
+
+En el terminal de Powershell en la misma ruta del certificado, ejecuto:
+kubectl create secret tls devops-tls --key tls.key --cert tls.crt
+kubectl get secret devops-tls
+
+
+Ingress con HTTPS
+Archivo:
+k8s/ingress.yaml
+Notas importantes:
+
+host puede ser cualquier subdominio barato de Azure Public IP.
+path: /DevOps cumple el requerimiento del curl.
+TLS apunta al secret devops-tls.
+
+Creación IP con DNS
+
+az network public-ip create --resource-group DevOpsRG --name devops-ingress-ip --sku Standard --allocation-method Static --dns-name devops-ingress-2025
+Verificación
+az network public-ip show --resource-group DevOpsRG --name devops-ingress-ip --query "{IP: ipAddress, DNS: dnsSettings.fqdn}" -o table
+Resultado:
+IP              DNS
+--------------  ---------------------------------------------
+52.224.127.197  devops-ingress-2025.eastus.cloudapp.azure.com
+
+En tu service.yaml, añade la IP pública:
+
+kubectl apply -f k8s/ingress.yaml
+kubectl get ingress
+
+en el k8s/ingress.yaml modificamos los hosts y host por el DNS que vemos arriba
+y kubectl apply -f k8s/ingress.yaml
+y comprobamos con kubectl get ingress
+
+
+Para borrar:
+
+kubectl delete deployment devops-microservice
+kubectl delete service devops-service
+kubectl delete ingress devops-ingress
+kubectl delete secret devops-secrets
+kubectl delete secret devops-tls-secret
+az network public-ip delete --resource-group DevOpsRG --name devops-ingress-ip
+
+
+kubectl apply -f k8s/
+kubectl delete -f k8s/
+terraform destroy -auto-approve

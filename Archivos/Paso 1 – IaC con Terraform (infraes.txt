@@ -1,0 +1,79 @@
+Paso 1 – IaC con Terraform (infraestructura base)
+
+Primero definimos todo lo que es infraestructura en Azure:
+
+Resource Group.
+
+ACR (Azure Container Registry) → donde se subirá tu imagen Docker.
+
+AKS (Azure Kubernetes Service) → cluster con 2 nodos mínimo.
+
+Asignación de ACR a AKS (para que AKS pueda hacer pull de la imagen).
+
+Resultado esperado: después de terraform apply, tienes un cluster AKS listo, un ACR y puedes hacer pull de imágenes privadas.
+
+Nota: No subimos todavía la imagen ni aplicamos manifests de K8s, eso viene después.
+
+Paso 2 – Docker y build de la imagen
+
+Ahora que ya existe el ACR, hacemos:
+
+docker build de tu microservicio.
+
+docker tag con la URL de tu ACR.
+
+docker push a tu ACR.
+
+Resultado esperado: tu imagen Docker ya está en ACR y lista para ser usada por AKS.
+
+Paso 3 – Manifests de Kubernetes
+
+Una vez AKS y ACR están listos y la imagen existe:
+
+Deployment → apuntando a la imagen en ACR.
+
+Service → LoadBalancer para exponer tu microservicio.
+
+Ingress → HTTPS para el curl del evaluador.
+
+Secrets → API_KEY, SECRET_KEY y TLS.
+
+Opcional: estos también se pueden crear desde Terraform usando provider kubernetes, pero puedes aplicarlos manualmente la primera vez para pruebas.
+
+Paso 4 – Pipeline en Azure DevOps
+
+Con la infraestructura y microservicio listos, hacemos el pipeline como código:
+
+YAML pipeline que haga build y push Docker a ACR.
+
+Que haga deploy en AKS usando kubectl apply de tus manifests.
+
+Que tenga stages “build” y “test” mínimo (como pide la prueba).
+
+Integrar tests automáticos de tu microservicio (ya los tienes).
+
+Definir que el master branch deploya a producción.
+
+Aquí ya aprovechas que Terraform también puede ser parte del pipeline para que incluso AKS + ACR se creen automáticamente si quieres.
+
+Paso 5 – Validación final
+
+Verificar que el endpoint /DevOps funcione en HTTPS.
+
+Probar que la API_KEY y JWT funcionen correctamente.
+
+Verificar que cada token JWT sea único y que no se pueda reutilizar.
+
+Revisar que los pods estén en mínimo 2 replicas, con readiness/liveness probe.
+
+🔹 Resumen del orden recomendado:
+
+Terraform → infra (RG, ACR, AKS).
+
+Docker → build y push a ACR.
+
+Kubernetes manifests → Deployment, Service, Ingress, Secrets.
+
+Pipeline en Azure DevOps → build, test, deploy.
+
+Validación final.

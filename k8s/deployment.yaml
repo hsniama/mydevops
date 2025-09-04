@@ -1,44 +1,29 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: devops-microservice
+  name: devops-app
+  namespace: devops
+  labels:
+    app: devops-app
 spec:
-  replicas: 2   # mínimo 2 para load balancing
+  replicas: 2
   selector:
     matchLabels:
-      app: devops-microservice
+      app: devops-app
   template:
     metadata:
       labels:
-        app: devops-microservice
+        app: devops-app
     spec:
       containers:
-        - name: devops-microservice
-          image: devopsregistryhenry.azurecr.io/devops-microservice:latest
-          ports:
-            - containerPort: 8000
-          env:
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: devops-secrets
-                  key: API_KEY
-            - name: SECRET_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: devops-secrets
-                  key: SECRET_KEY
-          readinessProbe:
-            httpGet:
-              path: /DevOps
-              port: 8000
-            initialDelaySeconds: 5
-            periodSeconds: 10
-          livenessProbe:
-            httpGet:
-              path: /DevOps
-              port: 8000
-            initialDelaySeconds: 15
-            periodSeconds: 20
+      - name: devops-app
+        image: devopsregistryhenry2025.azurecr.io/devops-microservice:latest
+        ports:
+        - containerPort: 8000
+        env:
+        - name: SECRET_KEY
+          value: "clave_super_secreta_segura"
+        - name: API_KEY
+          value: "2f5ae96c-b558-4c7b-a590-a501ae1c3f6c"
       imagePullSecrets:
-        - name: acr-auth
+      - name: acr-credentials
