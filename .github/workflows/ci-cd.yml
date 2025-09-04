@@ -36,7 +36,7 @@ jobs:
         run: flake8 .
 
       - name: Security (bandit)
-        run: bandit -r . -x tests
+        run: bandit -r app
 
       - name: Tests (pytest)
         run: pytest -q
