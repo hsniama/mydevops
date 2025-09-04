@@ -1,0 +1,503 @@
+Azure repos - Credenciales
+username:
+henrysebastian.niama
+
+password:
+8ckA5T3RkIluaSO3vIR1dfOwJiEeDGBVFzjVTlxSP2z5CHbNSOcVJQQJ99BEACAAAAA9tF8vAAASAZDO2IUd
+
+
+ACR
+Login Server: devopsregistryhenry.azurecr.io
+user: devopsregistryhenry
+pass: 7fBnVsQvMIt97laH19htty5eB0EOgfBxUVrIxvo6+c+ACRDmv/44
+pass2: 0cSLACqeI7LCGF4EVS3d2kQbMgpX2mUrAy1gtHrO29+ACRAyy5qf
+
+
+
+--------------------------------------------------------------------------------------------------
+Cada que se hace un cambio en el código:
+
+git add . && git commit -m "Modificación adicion Terrraform"
+git push
+
+Y poner clave de azure repos
+
+-------------------------------------------------------------------------------------------------------------
+Fase 1 desarrollo local: 
+uvicorn app.main:app --reload
+
+ejecutar ambiente de python
+
+
+curl -X GET http://localhost:8000/generate-jwt
+
+curl -X POST http://localhost:8000/DevOps \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: (endpoint obtenido en el primer endpoint get)" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hola",
+    "to": "Henry",
+    "from": "Azure",
+    "timeToLifeSec": 45
+}'
+
+
+curl -X POST "https://$HOST/DevOps" \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "This is a test",
+    "to": "Juan Perez",
+    "from": "Rita Asturia",
+    "timeToLifeSec": 45
+}'
+
+---------------------------------------------------------------------------------------------------------------------------
+Fase 2:
+
+- Construir imagen:
+docker build -t devops-microservice:local .
+
+
+Nota: Si cambiamos el dockerfile hay que reconstruir la imagen y para eso primero hay que borrarla y volverla a crear.
+Lo mismo con el contenedor.
+
+Cambios que requieren reconstrucción de la imagen:
+
+Modificas el Dockerfile
+Cambias el requirements.txt
+Cambias código fuente y usas COPY . . en el Dockerfile
+Cambias la estructura de carpetas o rutas copiadas al contenedor
+Quieres cambiar la imagen base (FROM python:...)
+Actualizas dependencias (pip, apt, etc.)
+Cambias la CMD o ENTRYPOINT
+
+- Cosntruir contenedor:
+
+docker rm -f devops-microservice
+docker rmi devops-microservice:local
+
+docker build -t devops-microservice:local .
+
+Correr contenedor sin pasar las claves (recomendado):
+docker run -d --name devops-microservice \
+  --env-file .env \
+  -p 8000:8000 \
+  devops-microservice:local
+
+Correr contenedor pasando las claves:
+docker run --name devops-microservice \
+  -p 8000:8000 \
+  --env SECRET_KEY=clave_super_secreta_segura \
+  --env API_KEY=2f5ae96c-b558-4c7b-a590-a501ae1c3f6c \
+  devops-microservice:local
+
+docker start -ai devops-microservice
+
+Para entrar al contenedor:
+docker exec -it devops-microservice /bin/sh
+
+
+Acceder en el navegador: http://localhost:8000/generate-jwt 
+y ejecutar el curl ...
+
+------------------------------------------------------------------------------
+Empaquetar tu imagen en un archivo .tar para compartirla (siempre y cuando pasamos las claves de .env directamente en 
+el comando de docker para crear el contenedor):
+
+docker save -o devops_microservice.tar devops-microservice:local
+
+Ese .tar pasamos a la persona y el ejecutará esto:
+
+docker load -i /ruta/donde/guardo/devops_microservice.tar
+
+Una ves carga la imagen, el ya puede correr el contenedor si esta en Linux:
+
+docker run --name devops-microservice \
+  -p 8000:8000 \
+  --env SECRET_KEY=clave_super_secreta_segura \
+  --env API_KEY=2f5ae96c-b558-4c7b-a590-a501ae1c3f6c \
+  devops-microservice:local
+
+O si estan en windows en powershell o CMD con:
+
+docker run --name devops-microservice ^
+  -p 8000:8000 ^
+  --env SECRET_KEY=clave_super_secreta_segura ^
+  --env API_KEY=2f5ae96c-b558-4c7b-a590-a501ae1c3f6c ^
+  devops-microservice:local
+
+Y ya puede probar con: http://localhost:8000/generate-jwt 
+
+------------------------------------------------------------------------------------
+
+Fase 3:
+docker build -t devops-microservice:v7 .
+docker tag devops-microservice:v4 devopsregistryhenry.azurecr.io/devops-microservice:v7
+docker push devopsregistryhenry.azurecr.io/devops-microservice:v7
+
+
+curl -X POST https://devops-ms-henry-hhfsbjcubeh5ehg3.eastus-01.azurewebsites.net/DevOps \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyIjoidGVzdCIsImV4cCI6MTc0MzU2Mjc5MX0.8m2XG-mU61bV2bohMOAMR2x-zdj0sDzd6QzXDjupEzU" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hola",
+    "to": "Henry",
+    "from": "Azure",
+    "timeToLifeSec": 45
+}'
+
+http://localhost:8000/generate-jwt 
+
+Prender el contenedor con:
+ docker run -d -p 8000:8000 --name devops-microservice devops-microservice:local
+
+------------------------------------------------------------------------------------------
+generar jwt
+python -m app.utils.generate_jwt
+
+------------------------------------------------------------------------------------------
+
+
+Paso 0.
+az login
+az account show
+az account set --subscription "Nombre-de-tu-suscripcion"
+
+
+Paso 1. Crear la Infra:
+
+terraform init	Inicializa el directorio de trabajo. Descarga proveedores y configura el backend.
+terraform fmt	Formatea los archivos .tf para mantener estilo y legibilidad uniforme.
+terraform validate	Verifica que la sintaxis y lógica del código Terraform sean válidas.
+terraform plan -out plan.out	Simula los cambios que se aplicarán. Guarda el plan en un archivo para ejecución segura.
+terraform apply "plan.out"	Aplica exactamente el plan guardado, evitando cambios inesperados.
+
+para destruir todo:
+terraform destroy -auto-approve
+
+Si cambio algo en los archivos de .tf y deseo redesplegar:
+terraform init -upgrade          Esto actualiza el lock file y descarga versiones nuevas de proveedores si hiciste cambios en required_providers.
+terraform fmt          # Formatea los archivos .tf
+terraform validate     # Verifica que la sintaxis sea válida
+terraform plan -out plan.out     Esto te muestra qué recursos se van a crear, modificar o destruir. El -out plan.out guarda el plan para aplicarlo exactamente como lo viste.
+terraform apply "plan.out"
+
+
+
+Paso 2. Obtén credenciales del AKS y valida el clúster
+# Trae el kubeconfig al entorno actual
+az aks get-credentials \
+  --resource-group rg-devops-henry \
+  --name aks-devops-henry \
+  --overwrite-existing
+
+# Verifica nodos (deben ser 2 en estado Ready) (Manual)
+kubectl get nodes -o wide
+
+
+Este comando es clave para conectar tu entorno local con el clúster AKS que creaste en Azure.
+Obtiene las credenciales de acceso (kubeconfig) del clúster AKS llamado aks-devops-henry dentro del grupo de recursos rg-devops-henry.
+Actualiza o crea el archivo ~/.kube/config, que es el archivo que kubectl usa para saber a qué clúster conectarse y con qué permisos.
+El flag --overwrite-existing reemplaza cualquier configuración previa para ese clúster en el archivo, asegurando que estás usando las credenciales más recientes.
+
+¿Por qué hay que ejecutarlo?
+Porque sin este paso, kubectl no sabe cómo conectarse al clúster AKS
+kubectl get nodes
+kubectl apply -f deployment.yaml
+kubectl logs pod-name
+
+Te permite desplegar tu microservicio, verificar el estado de los pods, configurar el Ingress Controller, y todo lo demás que requiere acceso directo al clúster.
+
+Paso 3. 
+Instalar NGINX Ingress Controller (Manual)
+
+kubectl create ns ingress-nginx
+
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx \
+  --set controller.replicaCount=2 \
+  --set controller.service.externalTrafficPolicy=Local
+
+Desglose:
+
+helm upgrade --install: Si el release ingress-nginx no existe, lo instala. Si ya existe, lo actualiza.
+
+ingress-nginx/ingress-nginx: Especifica el chart del repositorio.
+
+-n ingress-nginx: Lo instala en el namespace que creaste.
+
+--set controller.replicaCount=2: Despliega 2 réplicas del controlador, cumpliendo con el requisito de alta disponibilidad.
+
+--set controller.service.externalTrafficPolicy=Local: Asegura que el tráfico externo se enrute directamente al nodo donde está el pod, útil para preservar la IP del cliente en los logs (por ejemplo, para rate limiting o auditoría).
+
+
+Se crea un Deployment con 2 pods del Ingress Controller.
+
+Se expone un Service tipo LoadBalancer, que genera una IP pública en Azure.
+
+Esa IP será tu ${HOST} para el curl del evaluador.
+
+Obtén la IP pública:
+
+kubectl get svc -n ingress-nginx ingress-nginx-controller \
+  -o jsonpath='{.status.loadBalancer.ingress[0].ip}'; echo
+
+
+Todos los comandos de este paso se ejecutan una vez por ciclo de infraestructura.
+
+Al crear el clúster AKS por primera vez: porque el clúster está vacío y no tiene el Ingress Controller instalado.
+
+Cada vez que destruyes y recreas el clúster con Terraform: porque todo se borra, incluyendo el namespace, los pods, los servicios y la IP pública del Ingress.
+
+No necesitas ejecutarlos si el clúster sigue activo y el Ingress Controller ya está instalado.
+
+
+Paso 4. Crear subdominio gratis en DuckDNS
+
+Ve a https://www.duckdns.org/
+ y crea una cuenta (GitHub/Google).
+
+Crea un subdominio, por ejemplo: henrydevops.duckdns.org.
+
+En DuckDNS, asigna tu PUBLIC_IP al subdominio.
+
+Puedes actualizarlo manualmente ahora; si luego cambia, lo actualizas otra vez (o automatizas con su token).
+
+Con eso ya tienes un HOST gratuito y estable: henrydevops.duckdns.org.
+
+Ip de ejemplo que me da: 4.157.205.238
+
+
+Paso 5. Instalar cert-manager (emisión automática de TLS)
+
+kubectl create ns cert-manager
+
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+helm upgrade --install cert-manager jetstack/cert-manager \
+  -n cert-manager \
+  --set crds.enabled=true
+
+Después Crea los ClusterIssuer para Let’s Encrypt (staging y prod). Reemplaza el correo por el tuyo.
+
+kubectl apply -f cluster-issuer.yaml
+kubectl get clusterissuer
+
+
+Paso 6. Construcción y publicación de imagen en ACR.
+
+Primero abrir el Docker engine, o verificar que docker este corriendo en mi computador.
+
+6.1. Variables útiles
+En bash, digitar en la linea de comandos las siguientes variables:
+
+RG="rg-devops-henry"
+AKS="aks-devops-henry"
+ACR="acrdevopshenry"
+HOST="henrydevops.duckdns.org"   # tu dominio en DuckDNS
+IMAGE_NAME="devops-microservice"
+IMAGE_TAG="v1.0.0"
+NAMESPACE="devops"
+
+
+6.2 Construir y publicar la imagen en ACR
+
+# 1) Toma el login server de tu ACR
+ACR_LOGIN_SERVER=$(az acr show -n "$ACR" -g "$RG" --query loginServer -o tsv)
+echo "$ACR_LOGIN_SERVER"
+
+# 2) Conéctate a ACR
+az acr login -n "$ACR"
+
+# 3) Construye la imagen (desde la raíz del repo donde está tu Dockerfile)
+docker build -t "$ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG" .
+
+# 4) Publica la imagen
+docker push "$ACR_LOGIN_SERVER/$IMAGE_NAME:$IMAGE_TAG"
+
+
+Como tu AKS tiene identidad administrada con rol AcrPull sobre el ACR, no necesitamos imagePullSecrets.
+
+
+Paso 7. Manifiestos Kubernetes
+
+7.1 Namespace + Secrets
+
+Como ya esta creado los manifiestos Namespace y Secrets ejecuto:
+
+kubectl apply -f namespace-secrets.yaml
+
+7.2 Deployment + Service
+
+Una vez creado deployment-service.yaml 
+
+Ejecutar ahi mismo en la linea de comandos:
+
+sed -e "s|<ACR_LOGIN_SERVER>|$ACR_LOGIN_SERVER|g" \
+    -e "s|<IMAGE_NAME>|$IMAGE_NAME|g" \
+    -e "s|<IMAGE_TAG>|$IMAGE_TAG|g" \
+    deployment-service.yaml | kubectl apply -f -
+
+
+Este comando realiza una sustitución dinámica de variables dentro de un archivo YAML (usualmente un manifiesto de Kubernetes) y lo aplica directamente al clúster. 
+Vamos por partes:
+
+Usa sed para reemplazar los marcadores <ACR_LOGIN_SERVER>, <IMAGE_NAME>, y <IMAGE_TAG> dentro del archivo 10-deployment-service.yaml.
+
+Cada -e es una expresión de sustitución:
+
+s|<ACR_LOGIN_SERVER>|$ACR_LOGIN_SERVER|g reemplaza todos los <ACR_LOGIN_SERVER> por el valor real de la variable.
+
+Lo mismo para <IMAGE_NAME> y <IMAGE_TAG>.
+
+📄 deployment-service.yaml
+Es el archivo de manifiesto de Kubernetes que contiene placeholders que serán reemplazados.
+
+📦 | kubectl apply -f -
+El resultado del sed (el YAML con las variables ya reemplazadas) se pasa directamente a kubectl usando un pipe.
+
+-f - indica que kubectl debe leer desde la entrada estándar (stdin), no desde un archivo.
+
+
+Después validamos con el comando:
+ kubectl -n devops get deploy,po,svc -o wide
+
+
+7.3 Ingress con TLS (Let’s Encrypt) y redirección a HTTPS
+
+Una ves creado el ingress.yaml 
+
+Aplicar:
+sed -e "s|<HOST>|$HOST|g" ingress.yaml | kubectl apply -f -
+
+
+Comprueba certificados y el ingress:
+
+kubectl -n devops get certificate,ingress
+kubectl -n devops describe certificate devops-tls
+kubectl -n devops describe ingress devops-ingress
+
+
+Verás un Certificate para $HOST emitido por letsencrypt-prod y el Ingress apuntando al Service.
+Si DuckDNS ya resolvía hacia la IP del Ingress Controller (la que obtuviste antes), tu sitio servirá HTTPS.
+
+7.4 HPA (Horizontal Pod Autoscaler)
+
+una vez creado el hpa.yaml
+
+kubectl apply -f hpa.yaml
+kubectl -n devops get hpa
+
+
+8. Pruebas finales:
+
+Yo debo decirle al Evalaudor que la variable HOST mía sería:  henrydevops.duckdns.org
+Sin espacios.
+
+
+Generar el JWT:
+
+Opción 1 (el que yo le envió al evaluador):
+curl -s -X GET "https://$HOST/generate-jwt"
+
+Opción 2:
+JWT="$(curl -s "https://$HOST/generate-jwt" \
+  | tr -d '\r\n' \
+  | sed -E 's/.*"jwt":"([^"]+)".*/\1/')"
+
+
+Ejecutar el POST:
+
+Opción 1 (lo que debería ejecutar el evaluador):
+curl -X POST "https://$HOST/DevOps" \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: pegar aquí el JWT generado en la opción1" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "This is a test",
+    "to": "Juan Perez",
+    "from": "Rita Asturia",
+    "timeToLifeSec": 45
+}'
+
+
+
+Opción 2:
+curl -X POST "https://$HOST/DevOps" \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: $JWT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "This is a test",
+    "to": "Juan Perez",
+    "from": "Rita Asturia",
+    "timeToLifeSec": 45
+}'
+
+
+
+Por ende, yo solo le envio al evaluador el JWT y el HOST
+
+
+Si el evaluador tiene bash, le digo que ejecute esto:
+
+
+HOST="henrydevops.duckdns.org"
+
+JWT="$(curl -s "https://${HOST}/generate-jwt" | sed -E 's/.*"jwt":"([^"]+)".*/\1/')"
+
+curl -X POST "https://${HOST}/DevOps" \
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" \
+  -H "X-JWT-KWY: ${JWT}" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"This is a test","to":"Juan Perez","from":"Rita Asturia","timeToLifeSec":45}'
+
+Y listo, se terminó.
+
+
+Si el evaluador tiene Powershell:
+
+$MyHOST = "henrydevops.duckdns.org"
+$JWT  = (Invoke-RestMethod -Uri "https://$HOST/generate-jwt").jwt
+curl.exe -X POST "https://$MyHOST/DevOps" `
+  -H "X-Parse-REST-API-Key: 2f5ae96c-b558-4c7b-a590-a501ae1c3f6c" `
+  -H "X-JWT-KWY: $JWT" `
+  -H "Content-Type: application/json" `
+  -d '{"message":"This is a test","to":"Juan Perez","from":"Rita Asturia","timeToLifeSec":45}'
+
+
+Si un por sia caso hubiera errore con el AP Key ejecutar esto que recrea el secret y reinicia el deployment::
+
+kubectl -n devops create secret generic devops-secrets \
+  --from-literal=SECRET_KEY='clave_super_secreta_segura' \
+  --from-literal=API_KEY='2f5ae96c-b558-4c7b-a590-a501ae1c3f6c' \
+  -o yaml --dry-run=client | kubectl apply -f -
+
+kubectl -n devops rollout restart deployment/devops-app
+kubectl -n devops rollout status  deployment/devops-app
+
+
+
+
+-----------------------------------------------------------------------------------------
+Para borrar:
+
+kubectl delete deployment devops-microservice
+kubectl delete service devops-service
+kubectl delete ingress devops-ingress
+kubectl delete secret devops-secrets
+kubectl delete secret devops-tls-secret
+az network public-ip delete --resource-group DevOpsRG --name devops-ingress-ip
+
+
+kubectl apply -f k8s/
+kubectl delete -f k8s/
+
