@@ -141,16 +141,15 @@ jobs:
 
       - name: Apply base manifests (namespace/secret/svc/ingress/hpa)
         shell: bash
+        env:
+          HOST: henrydevops.duckdns.org   # o usa ${{ vars.HOST }} / ${{ secrets.HOST }} si lo prefieres
         run: |
           set -euo pipefail
-          # 1) Namespace + Secrets primero
           kubectl apply -f k8s/namespace-secrets.yaml
-          # 2) Deployment + Service
           kubectl apply -f k8s/deployment-service.yaml
-          # 3) Ingress
-          kubectl apply -f k8s/ingress.yaml
-          # 4) HPA
+          sed -e "s|<HOST>|$HOST|g" k8s/ingress.yaml | kubectl apply -f -
           kubectl apply -f k8s/hpa.yaml
+
 
       - name: Set new image (immutable SHA)
         shell: bash
