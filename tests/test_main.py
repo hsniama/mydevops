@@ -1,14 +1,13 @@
 import os
 
-from dotenv import load_dotenv
-from fastapi.testclient import TestClient
+# --- Definir variables de entorno ANTES de importar app ---
+os.environ.setdefault("API_KEY", "2f5ae96c-b558-4c7b-a590-a501ae1c3f6c")
+os.environ.setdefault("SECRET_KEY", "clave_super_secreta_de_tests")
 
-from app.main import app
-from app.utils.jwt_handler import create_jwt
+from fastapi.testclient import TestClient  # noqa: E402
+from app.main import app  # noqa: E402
+from app.utils.jwt_handler import create_jwt  # noqa: E402
 
-# Cargar .env si faltan variables (solo útil en local)
-if not os.getenv("API_KEY") or not os.getenv("SECRET_KEY"):
-    load_dotenv()
 
 client = TestClient(app)
 
@@ -23,9 +22,8 @@ def _payload() -> dict:
 
 
 def test_valid_post():
-    api_key = os.getenv("API_KEY")
-    secret_key = os.getenv("SECRET_KEY")
-    assert api_key and secret_key, "API_KEY/SECRET_KEY no están definidos"
+    api_key = os.environ["API_KEY"]
+    secret_key = os.environ["SECRET_KEY"]
 
     jwt_token = create_jwt(
         {"user": "test"},
@@ -49,9 +47,7 @@ def test_valid_post():
 
 
 def test_missing_api_key():
-    secret_key = os.getenv("SECRET_KEY")
-    assert secret_key, "SECRET_KEY no está definido"
-
+    secret_key = os.environ["SECRET_KEY"]
     jwt_token = create_jwt(
         {"user": "test"},
         secret_key=secret_key,
@@ -69,8 +65,7 @@ def test_missing_api_key():
 
 
 def test_invalid_jwt():
-    api_key = os.getenv("API_KEY")
-    assert api_key, "API_KEY no está definido"
+    api_key = os.environ["API_KEY"]
 
     response = client.post(
         "/DevOps",
@@ -88,7 +83,6 @@ def test_invalid_jwt():
 def test_invalid_method_get():
     response = client.get("/DevOps")
     assert response.status_code == 200
-    # FastAPI devuelve un JSON string, por eso las comillas en el body:
     assert response.text == '"ERROR"'
 
 
