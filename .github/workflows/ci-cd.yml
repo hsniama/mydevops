@@ -142,7 +142,7 @@ jobs:
       - name: Apply base manifests (namespace/secret/svc/ingress/hpa)
         shell: bash
         env:
-          HOST: henrydevops.duckdns.org   # o usa ${{ vars.HOST }} / ${{ secrets.HOST }} si lo prefieres
+          HOST: henrydevops.duckdns.org
         run: |
           set -euo pipefail
           kubectl apply -f k8s/namespace-secrets.yaml
